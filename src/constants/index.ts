@@ -12,6 +12,10 @@ export const DEFAULT_WORLD_PARAMS: WorldParams = {
     warpStrength: 0.8,
     waterLevel: 0.18,
   },
+  climate: {
+    temperature: 0.55,
+    moisture: 0.6,
+  },
 }
 
 export const ROUTES = {

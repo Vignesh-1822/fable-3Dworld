@@ -12,6 +12,7 @@ import {
 import { WebGPURenderer } from 'three/webgpu'
 import type { WorldParams } from '@/types/world'
 import { FlyControls } from './camera/FlyControls'
+import { generateClimate } from './terrain/climate'
 import { generateHeightfield } from './terrain/heightfield'
 import { buildTerrainMesh } from './terrain/terrainMesh'
 
@@ -87,7 +88,8 @@ export class WorldEngine {
     }
 
     const field = generateHeightfield(params, TERRAIN_RESOLUTION)
-    this.terrain = buildTerrainMesh(field, params, WORLD_SIZE)
+    const climate = generateClimate(params, field)
+    this.terrain = buildTerrainMesh(field, climate, params, WORLD_SIZE)
     this.scene.add(this.terrain)
 
     // Simple water plane at the configured level — Phase 4 upgrades this

@@ -13,9 +13,24 @@ export interface TerrainParams {
   waterLevel: number
 }
 
+export interface ClimateParams {
+  /** Baseline temperature in [0, 1]: 0 = arctic, 1 = tropical */
+  temperature: number
+  /** Baseline moisture in [0, 1]: 0 = desert, 1 = rainforest */
+  moisture: number
+}
+
 export interface WorldParams {
   seed: number
   terrain: TerrainParams
+  climate: ClimateParams
+}
+
+export interface ClimateField {
+  /** Per-vertex temperature in [0, 1], altitude lapse already applied */
+  temperature: Float32Array
+  /** Per-vertex moisture in [0, 1] */
+  moisture: Float32Array
 }
 
 export interface Heightfield {
