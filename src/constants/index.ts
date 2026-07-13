@@ -16,6 +16,11 @@ export const DEFAULT_WORLD_PARAMS: WorldParams = {
     temperature: 0.55,
     moisture: 0.6,
   },
+  atmosphere: {
+    timeOfDay: 10.5,
+    fogDensity: 0.35,
+    cloudCover: 0.4,
+  },
 }
 
 export const ROUTES = {

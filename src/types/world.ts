@@ -20,10 +20,20 @@ export interface ClimateParams {
   moisture: number
 }
 
+export interface AtmosphereParams {
+  /** Hour of day in [0, 24) — 6 ≈ sunrise, 12 = noon, 18 ≈ sunset */
+  timeOfDay: number
+  /** Fog thickness in [0, 1] */
+  fogDensity: number
+  /** Cloud coverage in [0, 1] */
+  cloudCover: number
+}
+
 export interface WorldParams {
   seed: number
   terrain: TerrainParams
   climate: ClimateParams
+  atmosphere: AtmosphereParams
 }
 
 export interface ClimateField {

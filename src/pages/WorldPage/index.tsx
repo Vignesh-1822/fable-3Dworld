@@ -10,7 +10,17 @@ export function WorldPage() {
   const params = useMemo<WorldParams>(() => {
     const seedParam = Number(searchParams.get('seed'))
     const seed = Number.isFinite(seedParam) && seedParam > 0 ? Math.floor(seedParam) : DEFAULT_WORLD_PARAMS.seed
-    return { ...DEFAULT_WORLD_PARAMS, seed }
+    const timeRaw = searchParams.get('t')
+    const timeParam = timeRaw === null ? Number.NaN : Number(timeRaw)
+    const timeOfDay =
+      Number.isFinite(timeParam) && timeParam >= 0 && timeParam < 24
+        ? timeParam
+        : DEFAULT_WORLD_PARAMS.atmosphere.timeOfDay
+    return {
+      ...DEFAULT_WORLD_PARAMS,
+      seed,
+      atmosphere: { ...DEFAULT_WORLD_PARAMS.atmosphere, timeOfDay },
+    }
   }, [searchParams])
 
   return (

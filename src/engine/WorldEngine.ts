@@ -1,8 +1,5 @@
 import {
-  Color,
-  DirectionalLight,
-  Fog,
-  HemisphereLight,
+  ACESFilmicToneMapping,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -12,6 +9,7 @@ import {
 import { WebGPURenderer } from 'three/webgpu'
 import type { WorldParams } from '@/types/world'
 import { FlyControls } from './camera/FlyControls'
+import { Atmosphere } from './sky/Atmosphere'
 import { generateClimate } from './terrain/climate'
 import { generateHeightfield } from './terrain/heightfield'
 import { buildTerrainMesh } from './terrain/terrainMesh'
@@ -27,13 +25,16 @@ const TERRAIN_RESOLUTION = 512 // heightfield samples per side
 export class WorldEngine {
   private renderer: WebGPURenderer | null = null
   private controls: FlyControls | null = null
+  private atmosphere: Atmosphere | null = null
   private resizeObserver: ResizeObserver | null = null
   private terrain: Mesh | null = null
   private water: Mesh | null = null
   private disposed = false
 
   private readonly scene = new Scene()
-  private readonly camera = new PerspectiveCamera(60, 1, 0.5, 12000)
+  // Far plane sits beyond the water plane's edge so the horizon is seamless;
+  // WebGPU's reverse-Z depth keeps precision fine at this range.
+  private readonly camera = new PerspectiveCamera(60, 1, 0.5, 60000)
   private lastFrameTime = performance.now()
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
@@ -45,19 +46,13 @@ export class WorldEngine {
     }
     this.renderer = renderer
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.toneMapping = ACESFilmicToneMapping
+    renderer.toneMappingExposure = 0.55
 
-    // Placeholder sky — Phase 3 replaces this with a real atmosphere
-    const skyColor = new Color('#87a7c4')
-    this.scene.background = skyColor
-    this.scene.fog = new Fog(skyColor, 800, 6000)
-
-    const sun = new DirectionalLight('#fff2dd', 2.6)
-    sun.position.set(-0.6, 0.7, 0.3).multiplyScalar(1000)
-    this.scene.add(sun)
-    this.scene.add(new HemisphereLight('#bcd3ea', '#3a4630', 0.7))
+    this.atmosphere = new Atmosphere(this.scene)
 
     this.camera.position.set(-WORLD_SIZE * 0.34, 480, WORLD_SIZE * 0.38)
-    this.camera.lookAt(0, 100, 0)
+    this.camera.lookAt(0, 260, 0)
 
     this.controls = new FlyControls(this.camera, canvas)
 
@@ -92,25 +87,28 @@ export class WorldEngine {
     this.terrain = buildTerrainMesh(field, climate, params, WORLD_SIZE)
     this.scene.add(this.terrain)
 
-    // Simple water plane at the configured level — Phase 4 upgrades this
-    const waterGeometry = new PlaneGeometry(WORLD_SIZE * 4, WORLD_SIZE * 4)
+    // Simple water plane at the configured level — Phase 4 upgrades this.
+    // Extends past the far clip plane so its edges never show; fog owns the
+    // transition to the horizon.
+    const waterGeometry = new PlaneGeometry(WORLD_SIZE * 20, WORLD_SIZE * 20)
     waterGeometry.rotateX(-Math.PI / 2)
     const waterMaterial = new MeshStandardMaterial({
-      color: '#1f4d63',
-      roughness: 0.12,
-      metalness: 0.4,
-      transparent: true,
-      opacity: 0.92,
+      color: '#2a5a72',
+      roughness: 0.15,
+      metalness: 0.3,
     })
     this.water = new Mesh(waterGeometry, waterMaterial)
     this.water.position.y = params.terrain.waterLevel * params.terrain.amplitude
     this.scene.add(this.water)
+
+    this.atmosphere?.update(params.atmosphere)
   }
 
   dispose(): void {
     this.disposed = true
     this.resizeObserver?.disconnect()
     this.controls?.dispose()
+    this.atmosphere?.dispose(this.scene)
     if (this.terrain) this.disposeMesh(this.terrain)
     if (this.water) this.disposeMesh(this.water)
     this.renderer?.setAnimationLoop(null)
