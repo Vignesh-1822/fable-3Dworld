@@ -48,3 +48,19 @@ export interface Heightfield {
   heights: Float32Array
   resolution: number
 }
+
+/** A single instanced-mesh placement: world position, Y rotation, uniform scale. */
+export interface InstanceTransform {
+  x: number
+  y: number
+  z: number
+  rotY: number
+  scale: number
+}
+
+/** Scattered vegetation instances, grouped by species/type for instanced rendering. */
+export interface VegetationPlacement {
+  conifers: InstanceTransform[]
+  broadleaves: InstanceTransform[]
+  grass: InstanceTransform[]
+}

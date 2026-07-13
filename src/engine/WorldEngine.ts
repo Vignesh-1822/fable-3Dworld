@@ -13,6 +13,8 @@ import { Atmosphere } from './sky/Atmosphere'
 import { generateClimate } from './terrain/climate'
 import { generateHeightfield } from './terrain/heightfield'
 import { buildTerrainMesh } from './terrain/terrainMesh'
+import { scatterVegetation } from './vegetation/scatter'
+import { Vegetation } from './vegetation/Vegetation'
 
 const WORLD_SIZE = 2048 // meters per side
 const TERRAIN_RESOLUTION = 512 // heightfield samples per side
@@ -29,6 +31,7 @@ export class WorldEngine {
   private resizeObserver: ResizeObserver | null = null
   private terrain: Mesh | null = null
   private water: Mesh | null = null
+  private vegetation: Vegetation | null = null
   private disposed = false
 
   private readonly scene = new Scene()
@@ -87,6 +90,14 @@ export class WorldEngine {
     this.terrain = buildTerrainMesh(field, climate, params, WORLD_SIZE)
     this.scene.add(this.terrain)
 
+    if (this.vegetation) {
+      this.scene.remove(this.vegetation.group)
+      this.vegetation.dispose()
+    }
+    const placement = scatterVegetation(field, climate, params, WORLD_SIZE)
+    this.vegetation = new Vegetation(placement, params.seed)
+    this.scene.add(this.vegetation.group)
+
     // Simple water plane at the configured level — Phase 4 upgrades this.
     // Extends past the far clip plane so its edges never show; fog owns the
     // transition to the horizon.
@@ -111,6 +122,7 @@ export class WorldEngine {
     this.atmosphere?.dispose(this.scene)
     if (this.terrain) this.disposeMesh(this.terrain)
     if (this.water) this.disposeMesh(this.water)
+    this.vegetation?.dispose()
     this.renderer?.setAnimationLoop(null)
     this.renderer?.dispose()
     this.renderer = null
