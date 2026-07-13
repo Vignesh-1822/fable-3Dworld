@@ -1,13 +1,13 @@
 /**
  * Local stand-in for the Lambda Function URL: `node dev-server.mjs` → POST
- * http://localhost:8787/generate. With no ANTHROPIC_API_KEY set it runs in
+ * http://localhost:8787/generate. With no OPENAI_API_KEY set it runs in
  * mock mode, returning deterministic canned params so the frontend can be
  * developed without spending credits.
  */
 import { createServer } from 'node:http'
 
 const PORT = Number(process.env.PORT ?? 8787)
-const MOCK = !process.env.ANTHROPIC_API_KEY
+const MOCK = !process.env.OPENAI_API_KEY
 
 function mockWorld(prompt) {
   // Cheap deterministic hash so different prompts give different worlds
@@ -76,5 +76,5 @@ const server = createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-  console.log(`worldseed dev API on http://localhost:${PORT} (${MOCK ? 'MOCK mode — set ANTHROPIC_API_KEY for real generations' : 'live mode'})`)
+  console.log(`worldseed dev API on http://localhost:${PORT} (${MOCK ? 'MOCK mode — set OPENAI_API_KEY for real generations' : 'live mode'})`)
 })

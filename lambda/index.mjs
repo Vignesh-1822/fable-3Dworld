@@ -4,7 +4,7 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? '*'
 
 // Per-instance token bucket: refills 1 request per 3s, burst of 10. Lambda
 // scales instances under real load, so this is abuse damping (protecting the
-// Anthropic credit balance), not precise per-user limiting.
+// API credit balance), not precise per-user limiting.
 const bucket = { tokens: 10, lastRefill: Date.now() }
 function takeToken() {
   const now = Date.now()
