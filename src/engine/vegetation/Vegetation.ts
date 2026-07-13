@@ -1,11 +1,9 @@
 import {
   type BufferGeometry,
-  DoubleSide,
   Euler,
   Group,
   InstancedMesh,
   Matrix4,
-  MeshStandardMaterial,
   Quaternion,
   Vector3,
 } from 'three'
@@ -13,6 +11,7 @@ import type { InstanceTransform, VegetationPlacement } from '@/types/world'
 import { createRandom } from '../noise/random'
 import { createGrassPatchGeometry } from './grassGeometry'
 import { createBroadleafGeometry, createConiferGeometry } from './treeGeometry'
+import { createWindMaterial } from './windMaterial'
 
 const scratchPosition = new Vector3()
 const scratchQuaternion = new Quaternion()
@@ -34,9 +33,20 @@ export class Vegetation {
     const broadleafGeometry = createBroadleafGeometry(createRandom(seed + 2))
     const grassGeometry = createGrassPatchGeometry(createRandom(seed + 3))
 
-    this.addInstancedMesh(coniferGeometry, placement.conifers, false)
-    this.addInstancedMesh(broadleafGeometry, placement.broadleaves, false)
-    this.addInstancedMesh(grassGeometry, placement.grass, true)
+    // Trees sway subtly at the crown; grass swings hard from near the base
+    this.addInstancedMesh(coniferGeometry, placement.conifers, {
+      strength: 0.25,
+      heightRange: 11,
+    })
+    this.addInstancedMesh(broadleafGeometry, placement.broadleaves, {
+      strength: 0.3,
+      heightRange: 8,
+    })
+    this.addInstancedMesh(grassGeometry, placement.grass, {
+      strength: 0.12,
+      heightRange: 0.7,
+      doubleSided: true,
+    })
   }
 
   dispose(): void {
@@ -52,19 +62,14 @@ export class Vegetation {
   private addInstancedMesh(
     geometry: BufferGeometry,
     transforms: InstanceTransform[],
-    doubleSided: boolean,
+    wind: { strength: number; heightRange: number; doubleSided?: boolean },
   ): void {
     if (transforms.length === 0) {
       geometry.dispose()
       return
     }
 
-    const material = new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.9,
-      metalness: 0,
-    })
-    if (doubleSided) material.side = DoubleSide
+    const material = createWindMaterial(wind)
 
     const mesh = new InstancedMesh(geometry, material, transforms.length)
     mesh.frustumCulled = false

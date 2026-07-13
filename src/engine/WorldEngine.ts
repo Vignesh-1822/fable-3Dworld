@@ -1,11 +1,4 @@
-import {
-  ACESFilmicToneMapping,
-  Mesh,
-  MeshStandardMaterial,
-  PerspectiveCamera,
-  PlaneGeometry,
-  Scene,
-} from 'three'
+import { ACESFilmicToneMapping, Mesh, PerspectiveCamera, Scene } from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import type { WorldParams } from '@/types/world'
 import { FlyControls } from './camera/FlyControls'
@@ -15,6 +8,7 @@ import { generateHeightfield } from './terrain/heightfield'
 import { buildTerrainMesh } from './terrain/terrainMesh'
 import { scatterVegetation } from './vegetation/scatter'
 import { Vegetation } from './vegetation/Vegetation'
+import { Water } from './water/Water'
 
 const WORLD_SIZE = 2048 // meters per side
 const TERRAIN_RESOLUTION = 512 // heightfield samples per side
@@ -30,8 +24,9 @@ export class WorldEngine {
   private atmosphere: Atmosphere | null = null
   private resizeObserver: ResizeObserver | null = null
   private terrain: Mesh | null = null
-  private water: Mesh | null = null
+  private water: Water | null = null
   private vegetation: Vegetation | null = null
+  private waterSeed: number | null = null
   private disposed = false
 
   private readonly scene = new Scene()
@@ -68,6 +63,7 @@ export class WorldEngine {
       const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1)
       this.lastFrameTime = now
       this.controls?.update(dt)
+      this.water?.update(dt)
       void renderer.render(this.scene, this.camera)
     })
   }
@@ -79,10 +75,6 @@ export class WorldEngine {
     if (this.terrain) {
       this.scene.remove(this.terrain)
       this.disposeMesh(this.terrain)
-    }
-    if (this.water) {
-      this.scene.remove(this.water)
-      this.disposeMesh(this.water)
     }
 
     const field = generateHeightfield(params, TERRAIN_RESOLUTION)
@@ -98,19 +90,18 @@ export class WorldEngine {
     this.vegetation = new Vegetation(placement, params.seed)
     this.scene.add(this.vegetation.group)
 
-    // Simple water plane at the configured level — Phase 4 upgrades this.
-    // Extends past the far clip plane so its edges never show; fog owns the
-    // transition to the horizon.
-    const waterGeometry = new PlaneGeometry(WORLD_SIZE * 20, WORLD_SIZE * 20)
-    waterGeometry.rotateX(-Math.PI / 2)
-    const waterMaterial = new MeshStandardMaterial({
-      color: '#2a5a72',
-      roughness: 0.15,
-      metalness: 0.3,
-    })
-    this.water = new Mesh(waterGeometry, waterMaterial)
-    this.water.position.y = params.terrain.waterLevel * params.terrain.amplitude
-    this.scene.add(this.water)
+    // Water surface is seed-dependent (ripple texture); rebuild only when
+    // the seed changes, otherwise just track the water level
+    if (this.waterSeed !== params.seed) {
+      if (this.water) {
+        this.scene.remove(this.water.mesh)
+        this.water.dispose()
+      }
+      this.water = new Water(params.seed, WORLD_SIZE)
+      this.scene.add(this.water.mesh)
+      this.waterSeed = params.seed
+    }
+    this.water?.setLevel(params.terrain.waterLevel * params.terrain.amplitude)
 
     this.atmosphere?.update(params.atmosphere)
   }
@@ -121,7 +112,7 @@ export class WorldEngine {
     this.controls?.dispose()
     this.atmosphere?.dispose(this.scene)
     if (this.terrain) this.disposeMesh(this.terrain)
-    if (this.water) this.disposeMesh(this.water)
+    this.water?.dispose()
     this.vegetation?.dispose()
     this.renderer?.setAnimationLoop(null)
     this.renderer?.dispose()
