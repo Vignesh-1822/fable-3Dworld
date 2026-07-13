@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { APP_NAME } from '@/constants'
 import { searchToParams, paramsToSearch } from '@/lib/urlParams'
 import type { WorldParams } from '@/types/world'
-import { WorldCanvas, WorldControls } from '@/components/organisms'
+import { PromptBar, WorldCanvas, WorldControls } from '@/components/organisms'
 
 export function WorldPage() {
   const [params, setParams] = useState<WorldParams>(() =>
@@ -30,12 +30,14 @@ export function WorldPage() {
 
       <WorldControls params={params} onChange={handleChange} generating={generating} />
 
+      <PromptBar onWorldGenerated={handleChange} disabled={generating} />
+
       <header className="pointer-events-none absolute left-4 top-4 select-none">
         <h1 className="text-lg font-semibold tracking-tight drop-shadow">{APP_NAME}</h1>
         <p className="text-xs text-white/70 drop-shadow">seed {params.seed}</p>
       </header>
 
-      <footer className="pointer-events-none absolute bottom-4 left-4 select-none text-xs text-white/70 drop-shadow">
+      <footer className="pointer-events-none absolute bottom-4 left-4 hidden select-none text-xs text-white/70 drop-shadow md:block">
         drag to look · WASD to fly · Q/E down/up · Shift to boost
       </footer>
     </main>
