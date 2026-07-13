@@ -1,7 +1,9 @@
 import { ACESFilmicToneMapping, Mesh, PerspectiveCamera, Scene } from 'three'
 import { WebGPURenderer } from 'three/webgpu'
-import type { WorldParams } from '@/types/world'
+import type { QualityPreset, WorldParams } from '@/types/world'
+import { CinematicCamera } from './camera/CinematicCamera'
 import { FlyControls } from './camera/FlyControls'
+import { QUALITY_SETTINGS } from './quality'
 import { Atmosphere } from './sky/Atmosphere'
 import { generateClimate } from './terrain/climate'
 import { generateHeightfield } from './terrain/heightfield'
@@ -11,7 +13,6 @@ import { Vegetation } from './vegetation/Vegetation'
 import { Water } from './water/Water'
 
 const WORLD_SIZE = 2048 // meters per side
-const TERRAIN_RESOLUTION = 512 // heightfield samples per side
 
 /**
  * Owns the renderer, scene graph and frame loop. React never touches three.js
@@ -21,6 +22,8 @@ const TERRAIN_RESOLUTION = 512 // heightfield samples per side
 export class WorldEngine {
   private renderer: WebGPURenderer | null = null
   private controls: FlyControls | null = null
+  private cinematicCamera: CinematicCamera | null = null
+  private cinematicEnabled = false
   private atmosphere: Atmosphere | null = null
   private resizeObserver: ResizeObserver | null = null
   private terrain: Mesh | null = null
@@ -28,12 +31,22 @@ export class WorldEngine {
   private vegetation: Vegetation | null = null
   private waterSeed: number | null = null
   private disposed = false
+  private quality: QualityPreset
+  private lastParams: WorldParams | null = null
 
   private readonly scene = new Scene()
   // Far plane sits beyond the water plane's edge so the horizon is seamless;
   // WebGPU's reverse-Z depth keeps precision fine at this range.
   private readonly camera = new PerspectiveCamera(60, 1, 0.5, 60000)
   private lastFrameTime = performance.now()
+
+  constructor(quality: QualityPreset = 'high') {
+    this.quality = quality
+  }
+
+  get isCinematic(): boolean {
+    return this.cinematicEnabled
+  }
 
   async init(canvas: HTMLCanvasElement): Promise<void> {
     const renderer = new WebGPURenderer({ canvas, antialias: true })
@@ -43,7 +56,7 @@ export class WorldEngine {
       return
     }
     this.renderer = renderer
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY_SETTINGS[this.quality].pixelRatioCap))
     renderer.toneMapping = ACESFilmicToneMapping
     renderer.toneMappingExposure = 0.55
 
@@ -53,6 +66,7 @@ export class WorldEngine {
     this.camera.lookAt(0, 260, 0)
 
     this.controls = new FlyControls(this.camera, canvas)
+    this.cinematicCamera = new CinematicCamera(this.camera, WORLD_SIZE)
 
     this.resizeObserver = new ResizeObserver(() => this.handleResize(canvas))
     this.resizeObserver.observe(canvas.parentElement ?? document.body)
@@ -62,22 +76,53 @@ export class WorldEngine {
       const now = performance.now()
       const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1)
       this.lastFrameTime = now
-      this.controls?.update(dt)
+      if (this.cinematicEnabled) {
+        this.cinematicCamera?.update(dt)
+      } else {
+        this.controls?.update(dt)
+      }
       this.water?.update(dt)
       void renderer.render(this.scene, this.camera)
     })
+  }
+
+  /** Enables/disables the hands-off looping camera path. FlyControls stays
+   * alive (not disposed) so its listeners keep working once cinematic mode
+   * exits; syncFromCamera() re-derives its yaw/pitch from wherever the
+   * cinematic camera left off, so the next drag continues smoothly. */
+  setCinematic(enabled: boolean): void {
+    if (this.cinematicEnabled === enabled) return
+    this.cinematicEnabled = enabled
+    if (enabled) {
+      this.cinematicCamera?.reset()
+    } else {
+      this.controls?.syncFromCamera()
+    }
+  }
+
+  /** Switches the active quality preset and rebuilds the world with it. */
+  setQuality(quality: QualityPreset): void {
+    if (this.quality === quality) return
+    this.quality = quality
+    if (this.renderer) {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY_SETTINGS[quality].pixelRatioCap))
+    }
+    if (this.lastParams) this.setParams(this.lastParams)
   }
 
   /** Rebuilds the world from scratch. Cheap enough to call on every change. */
   setParams(params: WorldParams): void {
     if (this.disposed) return
 
+    this.lastParams = params
+    const settings = QUALITY_SETTINGS[this.quality]
+
     if (this.terrain) {
       this.scene.remove(this.terrain)
       this.disposeMesh(this.terrain)
     }
 
-    const field = generateHeightfield(params, TERRAIN_RESOLUTION)
+    const field = generateHeightfield(params, settings.terrainResolution)
     const climate = generateClimate(params, field)
     this.terrain = buildTerrainMesh(field, climate, params, WORLD_SIZE)
     this.scene.add(this.terrain)
@@ -86,7 +131,7 @@ export class WorldEngine {
       this.scene.remove(this.vegetation.group)
       this.vegetation.dispose()
     }
-    const placement = scatterVegetation(field, climate, params, WORLD_SIZE)
+    const placement = scatterVegetation(field, climate, params, WORLD_SIZE, settings.vegetationDensity)
     this.vegetation = new Vegetation(placement, params.seed)
     this.scene.add(this.vegetation.group)
 
@@ -104,6 +149,9 @@ export class WorldEngine {
     this.water?.setLevel(params.terrain.waterLevel * params.terrain.amplitude)
 
     this.atmosphere?.update(params.atmosphere)
+
+    const amplitude = params.terrain.amplitude
+    this.cinematicCamera?.setAltitudeRange(0.45 * amplitude, 1.5 * amplitude)
   }
 
   dispose(): void {

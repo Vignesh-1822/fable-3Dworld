@@ -29,9 +29,7 @@ export class FlyControls {
     this.domElement = domElement
 
     // Adopt the camera's initial orientation
-    const dir = camera.getWorldDirection(new Vector3())
-    this.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)))
-    this.yaw = Math.atan2(-dir.x, -dir.z)
+    this.syncFromCamera()
 
     domElement.addEventListener('pointerdown', this.onPointerDown)
     domElement.addEventListener('pointermove', this.onPointerMove)
@@ -40,6 +38,15 @@ export class FlyControls {
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.onWindowBlur)
+  }
+
+  /** Re-reads yaw/pitch from the camera's current orientation. Call this whenever
+   * something else (e.g. a cinematic camera) has moved the camera out from under
+   * these controls, so the next drag continues smoothly instead of snapping back. */
+  syncFromCamera(): void {
+    const dir = this.camera.getWorldDirection(new Vector3())
+    this.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)))
+    this.yaw = Math.atan2(-dir.x, -dir.z)
   }
 
   update(dt: number): void {

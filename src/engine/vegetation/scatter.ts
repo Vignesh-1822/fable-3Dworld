@@ -24,6 +24,7 @@ export function scatterVegetation(
   climate: ClimateField,
   params: WorldParams,
   worldSize: number,
+  densityScale = 1,
 ): VegetationPlacement {
   const rng = createRandom(params.seed + 707)
   const { amplitude, waterLevel } = params.terrain
@@ -65,6 +66,7 @@ export function scatterVegetation(
             treeProb = Math.min(TREE_PROB_MAX, ramp * TREE_PROB_MAX)
           }
           if (t < TREE_MIN_TEMP) treeProb = 0
+          treeProb = Math.min(1, treeProb * densityScale)
 
           if (treeProb > 0 && rng() < treeProb) {
             let isConifer: boolean
@@ -102,7 +104,8 @@ export function scatterVegetation(
         t <= 0.8 &&
         h < 0.6
       ) {
-        if (rng() < 0.5) {
+        const grassProb = Math.min(1, 0.5 * densityScale)
+        if (rng() < grassProb) {
           grass.push({
             x: worldX,
             y: worldY,

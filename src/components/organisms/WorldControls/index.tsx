@@ -4,13 +4,21 @@ import { ParamSlider } from '@/components/molecules'
 import { Button } from '@/components/ui/button'
 import { WORLD_PARAM_LIMITS } from '@/lib/worldSchema'
 import { paramsToSearch } from '@/lib/urlParams'
-import type { WorldParams } from '@/types/world'
+import type { QualityPreset, WorldParams } from '@/types/world'
 
 interface WorldControlsProps {
   params: WorldParams
   onChange: (params: WorldParams) => void
   generating: boolean
+  quality: QualityPreset
+  onQualityChange: (quality: QualityPreset) => void
 }
+
+const QUALITY_OPTIONS: { value: QualityPreset; label: string }[] = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`
@@ -35,7 +43,7 @@ function initialOpenState(): boolean {
 }
 
 /** Glass-morphism control panel pinned top-right; drives WorldParams changes via param sliders. */
-export function WorldControls({ params, onChange, generating }: WorldControlsProps) {
+export function WorldControls({ params, onChange, generating, quality, onQualityChange }: WorldControlsProps) {
   const [open, setOpen] = useState(initialOpenState)
   const [copied, setCopied] = useState(false)
 
@@ -208,6 +216,29 @@ export function WorldControls({ params, onChange, generating }: WorldControlsPro
               format={formatPercent}
               onCommit={(v) => onChange({ ...params, atmosphere: { ...params.atmosphere, cloudCover: v } })}
             />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-white/50">Quality</h3>
+            <div className="flex gap-2">
+              {QUALITY_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={quality === option.value ? 'secondary' : 'outline'}
+                  size="sm"
+                  className={
+                    quality === option.value
+                      ? 'flex-1 bg-white/20 text-white hover:bg-white/30'
+                      : 'flex-1 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white'
+                  }
+                  aria-pressed={quality === option.value}
+                  onClick={() => onQualityChange(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
           </section>
         </div>
       )}

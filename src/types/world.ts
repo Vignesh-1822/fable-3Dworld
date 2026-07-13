@@ -29,6 +29,8 @@ export interface AtmosphereParams {
   cloudCover: number
 }
 
+export type QualityPreset = 'high' | 'medium' | 'low'
+
 export interface WorldParams {
   seed: number
   terrain: TerrainParams
