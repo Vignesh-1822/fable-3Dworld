@@ -5,6 +5,15 @@
  * developed without spending credits.
  */
 import { createServer } from 'node:http'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// Load lambda/.env if present (copy .env.example and add your key there)
+try {
+  process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '.env'))
+} catch {
+  // no .env file — fall back to whatever is already in the environment
+}
 
 const PORT = Number(process.env.PORT ?? 8787)
 const MOCK = !process.env.OPENAI_API_KEY

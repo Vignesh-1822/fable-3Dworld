@@ -53,15 +53,22 @@ output schema-constrained and clamped.
 ## Run it locally
 
 ```sh
-nvm use                # Node 22
+nvm use                      # Node 22
 npm install
-npm run dev            # frontend on :5173
+npm run dev                  # 1. frontend → http://localhost:5173
 
-node lambda/dev-server.mjs   # AI API on :8787 (mock mode — free, no key)
+node lambda/dev-server.mjs   # 2. AI API on :8787 (separate terminal)
 ```
 
-Add `OPENAI_API_KEY=sk-…` before the dev-server command for real
-generations. Deploying the Lambda: see [lambda/README.md](lambda/README.md).
+With no key the AI API runs in **mock mode** — free, deterministic, no
+account needed. For real AI generations:
+
+```sh
+cp lambda/.env.example lambda/.env   # then put your OpenAI key in lambda/.env
+node lambda/dev-server.mjs           # now prints "live mode"
+```
+
+Deploying to AWS: see [lambda/README.md](lambda/README.md).
 
 **Controls** — drag to look · WASD fly · Q/E down/up · Shift boost · `C` cinematic mode
 
