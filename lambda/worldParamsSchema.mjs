@@ -7,13 +7,8 @@
 export const WORLD_PARAMS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['seed', 'terrain', 'climate', 'atmosphere'],
+  required: ['terrain', 'climate', 'atmosphere'],
   properties: {
-    seed: {
-      type: 'integer',
-      description:
-        'World seed, any integer 1 to 2147483647. Pick arbitrarily unless the description implies a specific world identity.',
-    },
     terrain: {
       type: 'object',
       additionalProperties: false,

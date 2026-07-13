@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import OpenAI from 'openai'
 import { SYSTEM_PROMPT, WORLD_PARAMS_SCHEMA } from './worldParamsSchema.mjs'
 
@@ -43,7 +44,10 @@ export async function generateWorld(prompt) {
 
   // Guaranteed schema-valid JSON by strict structured outputs; parse defensively anyway
   try {
-    return JSON.parse(message.content)
+    const params = JSON.parse(message.content)
+    // Seed is pure variety, not interpretation — models pick "lazy" seeds
+    // (123456…) that make every prompt share terrain shapes, so roll it here
+    return { seed: randomInt(1, 2147483647), ...params }
   } catch {
     throw { statusCode: 502, message: 'Model returned unparseable JSON' }
   }
