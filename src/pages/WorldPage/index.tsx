@@ -1,31 +1,34 @@
-import { useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { APP_NAME, DEFAULT_WORLD_PARAMS } from '@/constants'
+import { useCallback, useState } from 'react'
+import { APP_NAME } from '@/constants'
+import { searchToParams, paramsToSearch } from '@/lib/urlParams'
 import type { WorldParams } from '@/types/world'
-import { WorldCanvas } from '@/components/organisms'
+import { WorldCanvas, WorldControls } from '@/components/organisms'
 
 export function WorldPage() {
-  const [searchParams] = useSearchParams()
+  const [params, setParams] = useState<WorldParams>(() =>
+    searchToParams(new URLSearchParams(window.location.search)),
+  )
+  const [generating, setGenerating] = useState(false)
 
-  const params = useMemo<WorldParams>(() => {
-    const seedParam = Number(searchParams.get('seed'))
-    const seed = Number.isFinite(seedParam) && seedParam > 0 ? Math.floor(seedParam) : DEFAULT_WORLD_PARAMS.seed
-    const timeRaw = searchParams.get('t')
-    const timeParam = timeRaw === null ? Number.NaN : Number(timeRaw)
-    const timeOfDay =
-      Number.isFinite(timeParam) && timeParam >= 0 && timeParam < 24
-        ? timeParam
-        : DEFAULT_WORLD_PARAMS.atmosphere.timeOfDay
-    return {
-      ...DEFAULT_WORLD_PARAMS,
-      seed,
-      atmosphere: { ...DEFAULT_WORLD_PARAMS.atmosphere, timeOfDay },
-    }
-  }, [searchParams])
+  const handleChange = useCallback((next: WorldParams) => {
+    setParams(next)
+    const search = paramsToSearch(next)
+    const url = `${window.location.pathname}?${search.toString()}${window.location.hash}`
+    window.history.replaceState(null, '', url)
+  }, [])
+
+  const handleGenerateStart = useCallback(() => setGenerating(true), [])
+  const handleGenerateEnd = useCallback(() => setGenerating(false), [])
 
   return (
     <main className="relative h-dvh w-dvw overflow-hidden bg-black text-white">
-      <WorldCanvas params={params} />
+      <WorldCanvas
+        params={params}
+        onGenerateStart={handleGenerateStart}
+        onGenerateEnd={handleGenerateEnd}
+      />
+
+      <WorldControls params={params} onChange={handleChange} generating={generating} />
 
       <header className="pointer-events-none absolute left-4 top-4 select-none">
         <h1 className="text-lg font-semibold tracking-tight drop-shadow">{APP_NAME}</h1>
