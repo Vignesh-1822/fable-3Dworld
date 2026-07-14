@@ -7,8 +7,11 @@ import {
   Quaternion,
   Vector3,
 } from 'three'
+import type { Material } from 'three'
 import type { InstanceTransform, VegetationPlacement } from '@/types/world'
 import { createRandom } from '../noise/random'
+import { createBoathouseGeometry, createCabinGeometry } from './cabinGeometry'
+import { createEmissiveWindowMaterial } from './emissiveMaterial'
 import { createFlowerPatchGeometry } from './flowerGeometry'
 import { createGrassPatchGeometry } from './grassGeometry'
 import { createRockGeometry } from './rockGeometry'
@@ -22,8 +25,8 @@ const scratchScale = new Vector3()
 const scratchMatrix = new Matrix4()
 
 /**
- * Owns the five InstancedMeshes (conifers, broadleaves, grass, rocks,
- * flowers) built from a VegetationPlacement. One geometry per
+ * Owns the InstancedMeshes (conifers, broadleaves, grass, rocks, flowers,
+ * cabins, boathouses) built from a VegetationPlacement. One geometry per
  * species/prop, generated from the world seed, so different worlds get
  * visually distinct trees.
  */
@@ -37,6 +40,8 @@ export class Vegetation {
     const grassGeometry = createGrassPatchGeometry(createRandom(seed + 3))
     const rockGeometry = createRockGeometry(createRandom(seed + 4))
     const flowerGeometry = createFlowerPatchGeometry(createRandom(seed + 5))
+    const cabinGeometry = createCabinGeometry(createRandom(seed + 6))
+    const boathouseGeometry = createBoathouseGeometry(createRandom(seed + 7))
 
     // Trees sway subtly at the crown; grass swings hard from near the base
     this.addInstancedMesh(coniferGeometry, placement.conifers, {
@@ -62,6 +67,12 @@ export class Vegetation {
       heightRange: 0.4,
       doubleSided: true,
     })
+
+    // Cabins/boathouses are rigid (no wind) and need per-vertex emissive
+    // window glow, so they share one emissive material instance each rather
+    // than going through the wind/static material paths above.
+    this.addInstancedMeshWithMaterial(cabinGeometry, placement.cabins, createEmissiveWindowMaterial())
+    this.addInstancedMeshWithMaterial(boathouseGeometry, placement.boathouses, createEmissiveWindowMaterial())
   }
 
   dispose(): void {
@@ -79,12 +90,16 @@ export class Vegetation {
     transforms: InstanceTransform[],
     wind: { strength: number; heightRange: number; doubleSided?: boolean } | null,
   ): void {
+    const material = wind ? createWindMaterial(wind) : createStaticMaterial()
+    this.addInstancedMeshWithMaterial(geometry, transforms, material)
+  }
+
+  private addInstancedMeshWithMaterial(geometry: BufferGeometry, transforms: InstanceTransform[], material: Material): void {
     if (transforms.length === 0) {
       geometry.dispose()
+      material.dispose()
       return
     }
-
-    const material = wind ? createWindMaterial(wind) : createStaticMaterial()
 
     const mesh = new InstancedMesh(geometry, material, transforms.length)
     mesh.frustumCulled = false

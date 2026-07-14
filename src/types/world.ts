@@ -67,4 +67,6 @@ export interface VegetationPlacement {
   grass: InstanceTransform[]
   rocks: InstanceTransform[]
   flowers: InstanceTransform[]
+  cabins: InstanceTransform[]
+  boathouses: InstanceTransform[]
 }

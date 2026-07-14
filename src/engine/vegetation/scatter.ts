@@ -7,6 +7,10 @@ const MAX_TREES = 45000
 const MAX_GRASS = 60000
 const MAX_ROCKS = 12000
 const MAX_FLOWERS = 25000
+const MAX_CABINS = 40
+const MAX_BOATHOUSES = 14
+const CABIN_MIN_SPACING = 120
+const BOATHOUSE_MIN_SPACING = 200
 
 const TREE_MOISTURE_MIN = 0.35
 const TREE_MOISTURE_MAX = 0.8
@@ -19,8 +23,8 @@ const BROADLEAF_MIN_TEMP = 0.55
  * Jittered-grid scatter over the terrain. One 320x320 grid cell is sampled
  * per iteration (position jittered within the cell), classified against
  * height/slope/temperature/moisture, and turned into an instance transform
- * for one of the five vegetation/prop types (conifers, broadleaves, grass,
- * rocks, flowers).
+ * for one of the vegetation/prop types (conifers, broadleaves, grass,
+ * rocks, flowers, cabins, boathouses).
  */
 export function scatterVegetation(
   field: Heightfield,
@@ -38,6 +42,13 @@ export function scatterVegetation(
   const grass: InstanceTransform[] = []
   const rocks: InstanceTransform[] = []
   const flowers: InstanceTransform[] = []
+  const cabins: InstanceTransform[] = []
+  const boathouses: InstanceTransform[] = []
+
+  // Horizontal positions of already-accepted cabins/boathouses, used to
+  // enforce minimum spacing via linear scan (cheap at these small caps).
+  const cabinPositions: Array<{ x: number; z: number }> = []
+  const boathousePositions: Array<{ x: number; z: number }> = []
 
   const cellSize = 1 / GRID_SIZE
   let treeCount = 0
@@ -167,10 +178,76 @@ export function scatterVegetation(
           })
         }
       }
+
+      // Cabins: rare, flat, well-inland clearings. Rolled after flowers so
+      // existing worlds keep their current tree/grass/rock/flower layout —
+      // this only appends further down the same rng stream.
+      if (
+        cabins.length < MAX_CABINS &&
+        h >= waterLevel + 0.02 &&
+        h <= 0.5 &&
+        upness >= 0.93 &&
+        m >= 0.3 &&
+        m <= 0.8 &&
+        t >= 0.25 &&
+        t <= 0.85
+      ) {
+        const cabinProb = Math.min(1, 0.005 * densityScale)
+        if (rng() < cabinProb) {
+          const rotY = rng() * Math.PI * 2
+          const scale = 0.9 + rng() * 0.25
+          if (isFarEnough(worldX, worldZ, cabinPositions, CABIN_MIN_SPACING)) {
+            cabins.push({ x: worldX, y: h * amplitude, z: worldZ, rotY, scale })
+            cabinPositions.push({ x: worldX, z: worldZ })
+          }
+        }
+      }
+
+      // Boathouses: narrow shoreline band just above the waterline, docks
+      // must face downhill toward the water via the terrain gradient.
+      if (boathouses.length < MAX_BOATHOUSES && h >= waterLevel + 0.004 && h <= waterLevel + 0.018 && upness >= 0.85) {
+        const boathouseProb = Math.min(1, 0.05 * densityScale)
+        if (rng() < boathouseProb) {
+          const scale = 0.9 + rng() * 0.2
+          if (isFarEnough(worldX, worldZ, boathousePositions, BOATHOUSE_MIN_SPACING)) {
+            const eps = 2 / resolution
+            const gx = sampleHeight(field, u + eps, v) - sampleHeight(field, u - eps, v)
+            const gz = sampleHeight(field, u, v + eps) - sampleHeight(field, u, v - eps)
+            const facing = normalizeXZ(-gx, -gz)
+            const rotY = Math.atan2(facing.x, facing.z)
+            boathouses.push({
+              x: worldX,
+              y: Math.max(h, waterLevel) * amplitude + 0.05,
+              z: worldZ,
+              rotY,
+              scale,
+            })
+            boathousePositions.push({ x: worldX, z: worldZ })
+          }
+        }
+      }
     }
   }
 
-  return { conifers, broadleaves, grass, rocks, flowers }
+  return { conifers, broadleaves, grass, rocks, flowers, cabins, boathouses }
+}
+
+/** True if (x, z) is at least `minDist` from every position already accepted. */
+function isFarEnough(x: number, z: number, existing: Array<{ x: number; z: number }>, minDist: number): boolean {
+  const minDistSq = minDist * minDist
+  for (const p of existing) {
+    const dx = x - p.x
+    const dz = z - p.z
+    if (dx * dx + dz * dz < minDistSq) return false
+  }
+  return true
+}
+
+/** Unit vector in the x-z plane; defaults to facing +z when the input is ~zero (flat ground). */
+function normalizeXZ(x: number, z: number): { x: number; z: number } {
+  const len = Math.sqrt(x * x + z * z)
+  if (len < 1e-6) return { x: 0, z: 1 }
+  return { x: x / len, z: z / len }
 }
 
 function clampIndex(i: number, resolution: number): number {
