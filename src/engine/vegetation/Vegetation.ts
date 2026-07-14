@@ -9,9 +9,11 @@ import {
 } from 'three'
 import type { InstanceTransform, VegetationPlacement } from '@/types/world'
 import { createRandom } from '../noise/random'
+import { createFlowerPatchGeometry } from './flowerGeometry'
 import { createGrassPatchGeometry } from './grassGeometry'
+import { createRockGeometry } from './rockGeometry'
 import { createBroadleafGeometry, createConiferGeometry } from './treeGeometry'
-import { createWindMaterial } from './windMaterial'
+import { createStaticMaterial, createWindMaterial } from './windMaterial'
 
 const scratchPosition = new Vector3()
 const scratchQuaternion = new Quaternion()
@@ -20,9 +22,10 @@ const scratchScale = new Vector3()
 const scratchMatrix = new Matrix4()
 
 /**
- * Owns the three InstancedMeshes (conifers, broadleaves, grass) built from a
- * VegetationPlacement. One geometry per species, generated from the world
- * seed, so different worlds get visually distinct trees.
+ * Owns the five InstancedMeshes (conifers, broadleaves, grass, rocks,
+ * flowers) built from a VegetationPlacement. One geometry per
+ * species/prop, generated from the world seed, so different worlds get
+ * visually distinct trees.
  */
 export class Vegetation {
   readonly group = new Group()
@@ -32,6 +35,8 @@ export class Vegetation {
     const coniferGeometry = createConiferGeometry(createRandom(seed + 1))
     const broadleafGeometry = createBroadleafGeometry(createRandom(seed + 2))
     const grassGeometry = createGrassPatchGeometry(createRandom(seed + 3))
+    const rockGeometry = createRockGeometry(createRandom(seed + 4))
+    const flowerGeometry = createFlowerPatchGeometry(createRandom(seed + 5))
 
     // Trees sway subtly at the crown; grass swings hard from near the base
     this.addInstancedMesh(coniferGeometry, placement.conifers, {
@@ -45,6 +50,16 @@ export class Vegetation {
     this.addInstancedMesh(grassGeometry, placement.grass, {
       strength: 0.12,
       heightRange: 0.7,
+      doubleSided: true,
+    })
+    // Rocks are rigid — a zero-strength wind material still declares the
+    // sway uniforms and trips a WebGPU zero-size-binding validation error
+    // once they constant-fold away, so rocks get the plain static material
+    // instead (see createStaticMaterial's doc comment).
+    this.addInstancedMesh(rockGeometry, placement.rocks, null)
+    this.addInstancedMesh(flowerGeometry, placement.flowers, {
+      strength: 0.1,
+      heightRange: 0.4,
       doubleSided: true,
     })
   }
@@ -62,14 +77,14 @@ export class Vegetation {
   private addInstancedMesh(
     geometry: BufferGeometry,
     transforms: InstanceTransform[],
-    wind: { strength: number; heightRange: number; doubleSided?: boolean },
+    wind: { strength: number; heightRange: number; doubleSided?: boolean } | null,
   ): void {
     if (transforms.length === 0) {
       geometry.dispose()
       return
     }
 
-    const material = createWindMaterial(wind)
+    const material = wind ? createWindMaterial(wind) : createStaticMaterial()
 
     const mesh = new InstancedMesh(geometry, material, transforms.length)
     mesh.frustumCulled = false

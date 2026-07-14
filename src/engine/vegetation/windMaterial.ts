@@ -37,3 +37,21 @@ export function createWindMaterial(options: WindMaterialOptions): MeshStandardNo
 
   return material
 }
+
+/**
+ * Same shading pipeline as createWindMaterial (vertex colors, matte
+ * roughness) but with no positionNode at all. Rigid props (rocks) use this
+ * instead of createWindMaterial({ strength: 0, ... }) — a zero-strength
+ * wind node still declares the `time`/`instanceIndex` TSL uniforms, and on
+ * WebGPU that produces a zero-size uniform buffer binding
+ * (GPUValidationError: "Binding size ... is zero") once the sway term
+ * constant-folds away. Skipping the node entirely avoids the bad binding.
+ */
+export function createStaticMaterial(): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial({
+    roughness: 0.9,
+    metalness: 0,
+  })
+  material.vertexColors = true
+  return material
+}

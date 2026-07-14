@@ -5,6 +5,8 @@ import { sampleHeight, sampleUpness } from '../terrain/sampleField'
 const GRID_SIZE = 320
 const MAX_TREES = 45000
 const MAX_GRASS = 60000
+const MAX_ROCKS = 12000
+const MAX_FLOWERS = 25000
 
 const TREE_MOISTURE_MIN = 0.35
 const TREE_MOISTURE_MAX = 0.8
@@ -17,7 +19,8 @@ const BROADLEAF_MIN_TEMP = 0.55
  * Jittered-grid scatter over the terrain. One 320x320 grid cell is sampled
  * per iteration (position jittered within the cell), classified against
  * height/slope/temperature/moisture, and turned into an instance transform
- * for one of the three vegetation types.
+ * for one of the five vegetation/prop types (conifers, broadleaves, grass,
+ * rocks, flowers).
  */
 export function scatterVegetation(
   field: Heightfield,
@@ -33,6 +36,8 @@ export function scatterVegetation(
   const conifers: InstanceTransform[] = []
   const broadleaves: InstanceTransform[] = []
   const grass: InstanceTransform[] = []
+  const rocks: InstanceTransform[] = []
+  const flowers: InstanceTransform[] = []
 
   const cellSize = 1 / GRID_SIZE
   let treeCount = 0
@@ -57,39 +62,41 @@ export function scatterVegetation(
       const aboveWater = h >= waterLevel + 0.008
       const treeline = h <= 0.78
 
-      if (treeCount < MAX_TREES && aboveWater && treeline) {
-        const upness = sampleUpness(field, u, v, amplitude, worldSize)
-        if (upness >= 0.72) {
-          let treeProb = 0
-          if (m >= TREE_MOISTURE_MIN) {
-            const ramp = (m - TREE_MOISTURE_MIN) / (TREE_MOISTURE_MAX - TREE_MOISTURE_MIN)
-            treeProb = Math.min(TREE_PROB_MAX, ramp * TREE_PROB_MAX)
-          }
-          if (t < TREE_MIN_TEMP) treeProb = 0
-          treeProb = Math.min(1, treeProb * densityScale)
+      // Shared across trees/rocks/flowers below — pure sample, doesn't touch
+      // the rng stream, so computing it unconditionally doesn't perturb
+      // determinism of the rolls that follow.
+      const upness = sampleUpness(field, u, v, amplitude, worldSize)
 
-          if (treeProb > 0 && rng() < treeProb) {
-            let isConifer: boolean
-            if (t < CONIFER_MAX_TEMP) {
-              isConifer = true
-            } else if (t > BROADLEAF_MIN_TEMP) {
-              isConifer = false
-            } else {
-              const broadleafChance = (t - CONIFER_MAX_TEMP) / (BROADLEAF_MIN_TEMP - CONIFER_MAX_TEMP)
-              isConifer = rng() >= broadleafChance
-            }
+      if (treeCount < MAX_TREES && aboveWater && treeline && upness >= 0.72) {
+        let treeProb = 0
+        if (m >= TREE_MOISTURE_MIN) {
+          const ramp = (m - TREE_MOISTURE_MIN) / (TREE_MOISTURE_MAX - TREE_MOISTURE_MIN)
+          treeProb = Math.min(TREE_PROB_MAX, ramp * TREE_PROB_MAX)
+        }
+        if (t < TREE_MIN_TEMP) treeProb = 0
+        treeProb = Math.min(1, treeProb * densityScale)
 
-            const transform: InstanceTransform = {
-              x: worldX,
-              y: worldY,
-              z: worldZ,
-              rotY: rng() * Math.PI * 2,
-              scale: 0.8 + rng() * 0.5,
-            }
-            if (isConifer) conifers.push(transform)
-            else broadleaves.push(transform)
-            treeCount++
+        if (treeProb > 0 && rng() < treeProb) {
+          let isConifer: boolean
+          if (t < CONIFER_MAX_TEMP) {
+            isConifer = true
+          } else if (t > BROADLEAF_MIN_TEMP) {
+            isConifer = false
+          } else {
+            const broadleafChance = (t - CONIFER_MAX_TEMP) / (BROADLEAF_MIN_TEMP - CONIFER_MAX_TEMP)
+            isConifer = rng() >= broadleafChance
           }
+
+          const transform: InstanceTransform = {
+            x: worldX,
+            y: worldY,
+            z: worldZ,
+            rotY: rng() * Math.PI * 2,
+            scale: 0.8 + rng() * 0.5,
+          }
+          if (isConifer) conifers.push(transform)
+          else broadleaves.push(transform)
+          treeCount++
         }
       }
 
@@ -115,10 +122,55 @@ export function scatterVegetation(
           })
         }
       }
+
+      // Rocks: independent roll appended after trees/grass so existing
+      // worlds keep their current layout — rocky slopes and alpine terrain
+      // get a probability bump, but rocks can sit closer to shore than trees.
+      if (rocks.length < MAX_ROCKS && h >= waterLevel + 0.004 && h <= 0.9) {
+        let rockProb = 0.015
+        if (upness < 0.78) rockProb += 0.05
+        if (h > 0.6) rockProb += 0.05
+        rockProb = Math.min(1, rockProb * densityScale)
+
+        if (rng() < rockProb) {
+          const rotY = rng() * Math.PI * 2
+          const scale = 0.4 + rng() * rng() * 1.8
+          rocks.push({
+            x: worldX,
+            y: worldY - 0.25 * scale,
+            z: worldZ,
+            rotY,
+            scale,
+          })
+        }
+      }
+
+      // Flowers: meadow conditions — flat, well-watered, temperate ground.
+      if (
+        flowers.length < MAX_FLOWERS &&
+        h >= waterLevel + 0.01 &&
+        h <= 0.55 &&
+        upness >= 0.8 &&
+        m >= 0.35 &&
+        m <= 0.8 &&
+        t >= 0.35 &&
+        t <= 0.8
+      ) {
+        const flowerProb = Math.min(1, 0.22 * densityScale)
+        if (rng() < flowerProb) {
+          flowers.push({
+            x: worldX,
+            y: worldY,
+            z: worldZ,
+            rotY: rng() * Math.PI * 2,
+            scale: 0.8 + rng() * 0.6,
+          })
+        }
+      }
     }
   }
 
-  return { conifers, broadleaves, grass }
+  return { conifers, broadleaves, grass, rocks, flowers }
 }
 
 function clampIndex(i: number, resolution: number): number {
