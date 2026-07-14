@@ -3,6 +3,7 @@ import { WebGPURenderer } from 'three/webgpu'
 import type { QualityPreset, WorldParams } from '@/types/world'
 import { CinematicCamera } from './camera/CinematicCamera'
 import { FlyControls } from './camera/FlyControls'
+import { Ambient } from './life/Ambient'
 import { Birds } from './life/Birds'
 import { QUALITY_SETTINGS } from './quality'
 import { Atmosphere } from './sky/Atmosphere'
@@ -31,6 +32,7 @@ export class WorldEngine {
   private water: Water | null = null
   private vegetation: Vegetation | null = null
   private birds: Birds | null = null
+  private ambient: Ambient | null = null
   private waterSeed: number | null = null
   private disposed = false
   private quality: QualityPreset
@@ -145,6 +147,13 @@ export class WorldEngine {
     this.birds = new Birds(field, params, WORLD_SIZE)
     this.scene.add(this.birds.mesh)
 
+    if (this.ambient) {
+      if (this.ambient.mesh) this.scene.remove(this.ambient.mesh)
+      this.ambient.dispose()
+    }
+    this.ambient = new Ambient(field, params, WORLD_SIZE)
+    if (this.ambient.mesh) this.scene.add(this.ambient.mesh)
+
     // Water surface is seed-dependent (ripple texture); rebuild only when
     // the seed changes, otherwise just track the water level
     if (this.waterSeed !== params.seed) {
@@ -173,6 +182,7 @@ export class WorldEngine {
     this.water?.dispose()
     this.vegetation?.dispose()
     this.birds?.dispose()
+    this.ambient?.dispose()
     this.renderer?.setAnimationLoop(null)
     this.renderer?.dispose()
     this.renderer = null
