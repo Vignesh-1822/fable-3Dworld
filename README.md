@@ -38,12 +38,12 @@ output schema-constrained and clamped.
 |---|---|
 | ![day](docs/screenshots/day.png) | ![sunset](docs/screenshots/sunset.png) |
 | Whittaker biomes: temperature × moisture drive forest, meadow, tundra, desert, snowline | One `timeOfDay` number drives sun, sky scattering, fog color, and golden-hour grading |
-| ![vegetation](docs/screenshots/vegetation.png) | ![night](docs/screenshots/night.png) |
-| ~30k instanced procedural trees + grass, placed by climate, swaying in GPU wind | Moonlit nights — the light rig swaps to a moon below −5° sun elevation |
+| ![snowfall](docs/screenshots/snowfall.png) | ![night](docs/screenshots/night.png) |
+| Weather reacts to climate: cold worlds get GPU snowfall, warm humid nights get fireflies | Moonlit nights — the light rig swaps to a moon, and cabin windows glow warm |
 
 - **Terrain** — domain-warped fBm + ridged multifractals on a 512² heightfield, radial falloff, valley-flattening curve
 - **Atmosphere** — physical sky (Rayleigh/Mie via three.js TSL), procedural clouds, exponential height fog, ACES tone mapping
-- **Vegetation** — species picked by climate, per-instance wind phase, all geometry built from primitives at runtime
+- **Life** — climate-placed trees, grass, wildflowers and boulders; flocking birds (boids); log cabins and boathouses whose windows glow at night; snowfall, fireflies and pollen — all geometry built from primitives at runtime
 - **Water** — a generated tileable ripple normal map (simplex noise on a torus), scrolled per-frame
 - **Deterministic** — same seed, same world, on any machine (`?seed=1337`)
 - **AI layer** — GPT-4o mini with strict structured outputs → zod-validated, range-clamped `WorldParams`; free mock mode for local dev
